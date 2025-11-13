@@ -1,14 +1,17 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, FileText, Download } from "lucide-react";
+import { ArrowLeft, Download, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { exams } from "@/data/exams";
+import DocumentUploadCard from "@/components/DocumentUploadCard";
+import { useState } from "react";
 
 const ExamDetails = () => {
   const { id } = useParams<{ id: string }>();
   const exam = exams.find((e) => e.id === id);
+  const [uploadedCount, setUploadedCount] = useState(0);
 
   if (!exam) {
     return (
@@ -62,68 +65,32 @@ const ExamDetails = () => {
 
         <section className="py-12 container mx-auto px-4">
           <div className="max-w-4xl mx-auto space-y-8">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-foreground">
-                Document Requirements
-              </h2>
-              <Button asChild>
-                <Link to="/bulk">
-                  <Download className="mr-2 h-4 w-4" />
-                  Start Bulk Processing
-                </Link>
-              </Button>
+            <div className="flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-foreground">
+                  Document Requirements & Upload
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Upload your documents below. We'll validate them and help you fix any issues.
+                </p>
+              </div>
+              {uploadedCount > 0 && (
+                <div className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <span className="text-muted-foreground">
+                    {uploadedCount} of {exam.documents.length} uploaded
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="grid gap-6">
               {exam.documents.map((doc, index) => (
-                <Card key={index}>
-                  <CardHeader>
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-primary/10 rounded-lg mt-1">
-                        <FileText className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="flex-grow">
-                        <CardTitle className="text-xl mb-2">{doc.name}</CardTitle>
-                        <CardContent className="p-0 space-y-3">
-                          <div className="grid md:grid-cols-2 gap-4">
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">
-                                Accepted Formats
-                              </p>
-                              <p className="text-foreground font-medium">
-                                {doc.format.join(", ")}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">
-                                Maximum Size
-                              </p>
-                              <p className="text-foreground font-medium">{doc.maxSize}</p>
-                            </div>
-                            {doc.dimensions && (
-                              <div>
-                                <p className="text-sm font-medium text-muted-foreground">
-                                  Dimensions
-                                </p>
-                                <p className="text-foreground font-medium">
-                                  {doc.dimensions}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                          {doc.notes && (
-                            <div className="pt-3 border-t border-border">
-                              <p className="text-sm font-medium text-muted-foreground mb-1">
-                                Additional Notes
-                              </p>
-                              <p className="text-foreground">{doc.notes}</p>
-                            </div>
-                          )}
-                        </CardContent>
-                      </div>
-                    </div>
-                  </CardHeader>
-                </Card>
+                <DocumentUploadCard 
+                  key={index} 
+                  document={doc} 
+                  examId={exam.id}
+                />
               ))}
             </div>
 
