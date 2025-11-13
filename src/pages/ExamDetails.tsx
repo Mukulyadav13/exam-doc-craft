@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Download, CheckCircle } from "lucide-react";
+import { ArrowLeft, Download, CheckCircle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Navbar from "@/components/Navbar";
@@ -49,7 +49,7 @@ const ExamDetails = () => {
               </Button>
 
               <div className="space-y-4">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <h1 className="text-4xl md:text-5xl font-bold text-foreground">
                     {exam.name}
                   </h1>
@@ -58,6 +58,17 @@ const ExamDetails = () => {
                   </span>
                 </div>
                 <p className="text-xl text-muted-foreground">{exam.fullName}</p>
+                {exam.officialSource && (
+                  <a 
+                    href={exam.officialSource} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Official Source: {exam.officialSource}
+                  </a>
+                )}
               </div>
             </div>
           </div>

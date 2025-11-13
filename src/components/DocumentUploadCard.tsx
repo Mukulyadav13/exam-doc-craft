@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { FileText, Upload, CheckCircle, AlertCircle, AlertTriangle } from "lucide-react";
+import { FileText, Upload, CheckCircle, AlertCircle, AlertTriangle, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DocumentRequirement } from "@/data/exams";
 import FilePreview from "./FilePreview";
 import ConversionDialog from "./ConversionDialog";
+import { getImageDimensions, parseDimensions, parseFileSize } from "@/utils/imageProcessor";
 
 interface DocumentUploadCardProps {
   document: DocumentRequirement;
@@ -27,62 +28,59 @@ const DocumentUploadCard = ({ document, examId }: DocumentUploadCardProps) => {
 
   const validateFile = async (file: File): Promise<UploadedFile> => {
     const preview = URL.createObjectURL(file);
-    const format = file.type.split("/")[1].toUpperCase();
+    const format = file.type.split("/")[1]?.toUpperCase() || "UNKNOWN";
     const size = file.size;
     const issues: string[] = [];
 
     // Check format
-    if (!document.format.includes(format) && !document.format.includes(format.replace("JPEG", "JPG"))) {
-      issues.push(`Format should be ${document.format.join(" or ")}`);
+    const normalizedFormat = format.replace("JPEG", "JPG");
+    if (!document.format.some(f => f === normalizedFormat || (f === "JPG" && format === "JPEG"))) {
+      issues.push(`Format must be ${document.format.join(" or ")}`);
     }
 
     // Check size
-    const maxSizeKB = parseInt(document.maxSize.match(/\d+/)?.[0] || "0");
+    const sizeReq = parseFileSize(document.maxSize);
     const fileSizeKB = size / 1024;
-    if (fileSizeKB > maxSizeKB) {
-      issues.push(`Size exceeds ${document.maxSize}`);
+    
+    if (sizeReq.min && fileSizeKB < sizeReq.min) {
+      issues.push(`Size too small (min ${sizeReq.min} KB)`);
+    }
+    if (fileSizeKB > sizeReq.max) {
+      issues.push(`Size exceeds ${sizeReq.max} KB`);
     }
 
     // Get dimensions for images
     let dimensions: { width: number; height: number } | undefined;
     if (file.type.startsWith("image/")) {
-      dimensions = await getImageDimensions(file);
-      
-      if (document.dimensions && dimensions) {
-        const requiredDims = document.dimensions.match(/(\d+\.?\d*)\s*cm\s*x\s*(\d+\.?\d*)\s*cm/i);
-        if (requiredDims) {
-          // Convert cm to pixels (rough estimate: 1cm ≈ 37.8 pixels at 96 DPI)
-          const reqWidth = parseFloat(requiredDims[1]) * 37.8;
-          const reqHeight = parseFloat(requiredDims[2]) * 37.8;
-          const tolerance = 50; // pixels
+      try {
+        dimensions = await getImageDimensions(file);
+        
+        if (document.dimensions && dimensions) {
+          const requiredDims = parseDimensions(document.dimensions, document.dpi || 200);
           
-          if (Math.abs(dimensions.width - reqWidth) > tolerance || 
-              Math.abs(dimensions.height - reqHeight) > tolerance) {
-            issues.push(`Dimensions should be approximately ${document.dimensions}`);
+          if (requiredDims) {
+            const tolerance = 50; // pixels tolerance
+            
+            if (Math.abs(dimensions.width - requiredDims.width) > tolerance || 
+                Math.abs(dimensions.height - requiredDims.height) > tolerance) {
+              issues.push(`Dimensions should be ${document.dimensions} (currently ${dimensions.width}x${dimensions.height}px)`);
+            }
           }
         }
+      } catch (error) {
+        console.error("Error getting dimensions:", error);
       }
     }
 
     return {
       file,
       preview,
-      format,
+      format: normalizedFormat,
       size,
       dimensions,
       isCompliant: issues.length === 0,
       issues,
     };
-  };
-
-  const getImageDimensions = (file: File): Promise<{ width: number; height: number }> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        resolve({ width: img.width, height: img.height });
-      };
-      img.src = URL.createObjectURL(file);
-    });
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -154,6 +152,20 @@ const DocumentUploadCard = ({ document, examId }: DocumentUploadCardProps) => {
                   {document.notes && (
                     <div className="pt-2 border-t border-border">
                       <span className="text-muted-foreground text-xs">{document.notes}</span>
+                    </div>
+                  )}
+                  {document.backgroundColor && (
+                    <div className="pt-2">
+                      <span className="text-muted-foreground text-xs">
+                        Background: {document.backgroundColor}
+                      </span>
+                    </div>
+                  )}
+                  {document.dpi && (
+                    <div>
+                      <span className="text-muted-foreground text-xs">
+                        DPI: {document.dpi}
+                      </span>
                     </div>
                   )}
                 </div>

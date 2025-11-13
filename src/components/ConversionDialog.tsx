@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { DocumentRequirement } from "@/data/exams";
 import { toast } from "sonner";
 import Loader from "./Loader";
+import { convertImage, parseDimensions, parseFileSize } from "@/utils/imageProcessor";
 
 interface UploadedFile {
   file: File;
@@ -40,25 +41,46 @@ const ConversionDialog = ({
   const [quality, setQuality] = useState([80]);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Auto-populate recommended dimensions
+  useEffect(() => {
+    if (document.dimensions) {
+      const dims = parseDimensions(document.dimensions, document.dpi || 200);
+      if (dims) {
+        setWidth(dims.width.toString());
+        setHeight(dims.height.toString());
+      }
+    }
+  }, [document]);
+
   const handleConvert = async () => {
     setIsProcessing(true);
     
-    // Simulate processing
-    setTimeout(() => {
-      // Create dummy converted file
-      const blob = new Blob(["Converted file content"], { 
-        type: `image/${targetFormat.toLowerCase()}` 
+    try {
+      const sizeReq = parseFileSize(document.maxSize);
+      
+      const blob = await convertImage(uploadedFile.file, {
+        targetFormat,
+        targetWidth: parseInt(width),
+        targetHeight: parseInt(height),
+        targetSizeKB: sizeReq.max,
+        quality: quality[0] / 100,
+        dpi: document.dpi || 200,
       });
+
       const file = new File(
         [blob], 
-        `converted-${uploadedFile.file.name}.${targetFormat.toLowerCase()}`,
+        `converted-${uploadedFile.file.name.split('.')[0]}.${targetFormat.toLowerCase()}`,
         { type: blob.type }
       );
       
       setIsProcessing(false);
       onConversionComplete(file);
-      toast.success("Document converted successfully!");
-    }, 2000);
+      toast.success(`Document converted successfully! Size: ${(blob.size / 1024).toFixed(2)} KB`);
+    } catch (error) {
+      console.error("Conversion error:", error);
+      setIsProcessing(false);
+      toast.error("Failed to convert document. Please try again.");
+    }
   };
 
   // Parse dimensions from requirement
