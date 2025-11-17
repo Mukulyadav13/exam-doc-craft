@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Download, CheckCircle, ExternalLink } from "lucide-react";
+import { ArrowLeft, CheckCircle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Navbar from "@/components/Navbar";
@@ -105,24 +105,6 @@ const ExamDetails = () => {
               ))}
             </div>
 
-            <Card className="bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20">
-              <CardHeader>
-                <CardTitle className="text-center">Ready to Prepare Your Documents?</CardTitle>
-                <CardContent className="p-0 pt-4">
-                  <p className="text-center text-muted-foreground mb-6">
-                    Use our bulk processing tool to handle all your documents at once
-                  </p>
-                  <div className="flex justify-center">
-                    <Button size="lg" asChild>
-                      <Link to="/bulk">
-                        <Download className="mr-2 h-5 w-5" />
-                        Start Bulk Processing
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </CardHeader>
-            </Card>
           </div>
         </section>
       </main>

@@ -6,6 +6,7 @@ import { DocumentRequirement } from "@/data/exams";
 import FilePreview from "./FilePreview";
 import ConversionDialog from "./ConversionDialog";
 import { getImageDimensions, parseDimensions, parseFileSize } from "@/utils/imageProcessor";
+import { toast } from "sonner";
 
 interface DocumentUploadCardProps {
   document: DocumentRequirement;
@@ -89,14 +90,21 @@ const DocumentUploadCard = ({ document, examId }: DocumentUploadCardProps) => {
 
     const validated = await validateFile(file);
     setUploadedFile(validated);
+    
+    if (validated.isCompliant) {
+      toast.success("Document meets all requirements!");
+    } else {
+      toast.info("Document uploaded. Click 'Resize' to fix issues.");
+    }
   };
 
   const handleConvert = () => {
     setShowConversion(true);
   };
 
-  const handleConversionComplete = (newFile: File) => {
-    validateFile(newFile).then(setUploadedFile);
+  const handleConversionComplete = async (newFile: File) => {
+    const validated = await validateFile(newFile);
+    setUploadedFile(validated);
     setShowConversion(false);
   };
 

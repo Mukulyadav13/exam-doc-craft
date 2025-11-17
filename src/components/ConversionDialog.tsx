@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DocumentRequirement } from "@/data/exams";
 import { toast } from "sonner";
 import Loader from "./Loader";
@@ -40,6 +41,7 @@ const ConversionDialog = ({
   const [height, setHeight] = useState(uploadedFile.dimensions?.height.toString() || "600");
   const [quality, setQuality] = useState([80]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [mode, setMode] = useState<"auto" | "manual">("auto");
 
   // Auto-populate recommended dimensions
   useEffect(() => {
@@ -52,7 +54,40 @@ const ConversionDialog = ({
     }
   }, [document]);
 
-  const handleConvert = async () => {
+  const handleAutoConvert = async () => {
+    setIsProcessing(true);
+    
+    try {
+      const sizeReq = parseFileSize(document.maxSize);
+      const dims = parseDimensions(document.dimensions || "", document.dpi || 200);
+      
+      const blob = await convertImage(uploadedFile.file, {
+        targetFormat,
+        targetWidth: dims?.width,
+        targetHeight: dims?.height,
+        targetSizeKB: sizeReq.max,
+        quality: 0.85,
+        dpi: document.dpi || 200,
+      });
+
+      const file = new File(
+        [blob], 
+        `converted-${uploadedFile.file.name.split('.')[0]}.${targetFormat.toLowerCase()}`,
+        { type: blob.type }
+      );
+      
+      setIsProcessing(false);
+      onConversionComplete(file);
+      onOpenChange(false);
+      toast.success(`Document auto-converted successfully! Size: ${(blob.size / 1024).toFixed(2)} KB`);
+    } catch (error) {
+      console.error("Auto conversion error:", error);
+      setIsProcessing(false);
+      toast.error("Failed to auto-convert document. Please try manual mode.");
+    }
+  };
+
+  const handleManualConvert = async () => {
     setIsProcessing(true);
     
     try {
@@ -75,6 +110,7 @@ const ConversionDialog = ({
       
       setIsProcessing(false);
       onConversionComplete(file);
+      onOpenChange(false);
       toast.success(`Document converted successfully! Size: ${(blob.size / 1024).toFixed(2)} KB`);
     } catch (error) {
       console.error("Conversion error:", error);
@@ -109,122 +145,188 @@ const ConversionDialog = ({
 
         {!isProcessing ? (
           <div className="space-y-6 py-4">
-            {/* Format Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="format">Target Format</Label>
-              <Select value={targetFormat} onValueChange={setTargetFormat}>
-                <SelectTrigger id="format">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {document.format.map((fmt) => (
-                    <SelectItem key={fmt} value={fmt}>
-                      {fmt}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Required: {document.format.join(", ")}
-              </p>
-            </div>
+            <Tabs value={mode} onValueChange={(v) => setMode(v as "auto" | "manual")} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="auto">Auto Resize</TabsTrigger>
+                <TabsTrigger value="manual">Manual Settings</TabsTrigger>
+              </TabsList>
 
-            {/* Dimensions */}
-            {uploadedFile.file.type.startsWith("image/") && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="width">Width (px)</Label>
-                    <Input
-                      id="width"
-                      type="number"
-                      value={width}
-                      onChange={(e) => setWidth(e.target.value)}
-                    />
+              <TabsContent value="auto" className="space-y-4 mt-6">
+                <div className="rounded-lg bg-muted p-4 space-y-3">
+                  <h3 className="font-medium text-foreground">Auto Conversion Settings</h3>
+                  <div className="text-sm text-muted-foreground space-y-2">
+                    <div className="flex justify-between">
+                      <span>Target Format:</span>
+                      <span className="text-foreground font-medium">{targetFormat}</span>
+                    </div>
+                    {document.dimensions && (
+                      <div className="flex justify-between">
+                        <span>Dimensions:</span>
+                        <span className="text-foreground font-medium">{document.dimensions}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span>Max Size:</span>
+                      <span className="text-foreground font-medium">{document.maxSize}</span>
+                    </div>
+                    {document.dpi && (
+                      <div className="flex justify-between">
+                        <span>DPI:</span>
+                        <span className="text-foreground font-medium">{document.dpi}</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="height">Height (px)</Label>
-                    <Input
-                      id="height"
-                      type="number"
-                      value={height}
-                      onChange={(e) => setHeight(e.target.value)}
-                    />
-                  </div>
-                </div>
-                
-                {recommended && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setWidth(recommended.width.toString());
-                        setHeight(recommended.height.toString());
-                      }}
-                    >
-                      Use Recommended: {recommended.width} x {recommended.height} px
-                    </Button>
-                  </div>
-                )}
-
-                {document.dimensions && (
-                  <p className="text-xs text-muted-foreground">
-                    Required dimensions: {document.dimensions}
+                  <p className="text-xs text-muted-foreground pt-2">
+                    Your document will be automatically converted to meet all requirements with optimal quality.
                   </p>
+                </div>
+
+                {/* Format Selection for Auto Mode */}
+                <div className="space-y-2">
+                  <Label htmlFor="auto-format">Select Target Format</Label>
+                  <Select value={targetFormat} onValueChange={setTargetFormat}>
+                    <SelectTrigger id="auto-format">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {document.format.map((fmt) => (
+                        <SelectItem key={fmt} value={fmt}>
+                          {fmt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button variant="outline" onClick={() => onOpenChange(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAutoConvert} className="min-w-[140px]">
+                    Auto Convert
+                  </Button>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="manual" className="space-y-4 mt-6">
+                {/* Format Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="format">Target Format</Label>
+                  <Select value={targetFormat} onValueChange={setTargetFormat}>
+                    <SelectTrigger id="format">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {document.format.map((fmt) => (
+                        <SelectItem key={fmt} value={fmt}>
+                          {fmt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Required: {document.format.join(", ")}
+                  </p>
+                </div>
+
+                {/* Dimensions */}
+                {uploadedFile.file.type.startsWith("image/") && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="width">Width (px)</Label>
+                        <Input
+                          id="width"
+                          type="number"
+                          value={width}
+                          onChange={(e) => setWidth(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="height">Height (px)</Label>
+                        <Input
+                          id="height"
+                          type="number"
+                          value={height}
+                          onChange={(e) => setHeight(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    
+                    {recommended && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setWidth(recommended.width.toString());
+                            setHeight(recommended.height.toString());
+                          }}
+                        >
+                          Use Recommended: {recommended.width} x {recommended.height} px
+                        </Button>
+                      </div>
+                    )}
+
+                    {document.dimensions && (
+                      <p className="text-xs text-muted-foreground">
+                        Required dimensions: {document.dimensions}
+                      </p>
+                    )}
+                  </div>
                 )}
-              </div>
-            )}
 
-            {/* Quality/Compression */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="quality">Quality / Compression</Label>
-                <span className="text-sm text-muted-foreground">{quality[0]}%</span>
-              </div>
-              <Slider
-                id="quality"
-                value={quality}
-                onValueChange={setQuality}
-                min={10}
-                max={100}
-                step={5}
-                className="w-full"
-              />
-              <p className="text-xs text-muted-foreground">
-                Lower quality = smaller file size. Max size: {document.maxSize}
-              </p>
-            </div>
-
-            {/* Current vs Target Info */}
-            <div className="rounded-lg bg-muted p-4 space-y-2 text-sm">
-              <div className="font-medium text-foreground">Preview Changes:</div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <span className="text-muted-foreground">Current: </span>
-                  <span className="text-foreground">
-                    {uploadedFile.format}, {(uploadedFile.size / 1024).toFixed(2)} KB
-                  </span>
+                {/* Quality/Compression */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="quality">Quality / Compression</Label>
+                    <span className="text-sm text-muted-foreground">{quality[0]}%</span>
+                  </div>
+                  <Slider
+                    id="quality"
+                    value={quality}
+                    onValueChange={setQuality}
+                    min={10}
+                    max={100}
+                    step={5}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Lower quality = smaller file size. Max size: {document.maxSize}
+                  </p>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">Target: </span>
-                  <span className="text-foreground">
-                    {targetFormat}, ~{((uploadedFile.size / 1024) * (quality[0] / 100)).toFixed(2)} KB
-                  </span>
-                </div>
-              </div>
-            </div>
 
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleConvert}>
-                Convert Document
-              </Button>
-            </div>
+                {/* Current vs Target Info */}
+                <div className="rounded-lg bg-muted p-4 space-y-2 text-sm">
+                  <div className="font-medium text-foreground">Preview Changes:</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-muted-foreground">Current: </span>
+                      <span className="text-foreground">
+                        {uploadedFile.format}, {(uploadedFile.size / 1024).toFixed(2)} KB
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Target: </span>
+                      <span className="text-foreground">
+                        {targetFormat}, ~{((uploadedFile.size / 1024) * (quality[0] / 100)).toFixed(2)} KB
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button variant="outline" onClick={() => onOpenChange(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleManualConvert} className="min-w-[140px]">
+                    Convert Document
+                  </Button>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         ) : (
           <div className="py-12">

@@ -1,6 +1,7 @@
 import { CheckCircle, AlertCircle, AlertTriangle, Download, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 interface UploadedFile {
   file: File;
@@ -49,14 +50,20 @@ const FilePreview = ({ uploadedFile, onConvert }: FilePreviewProps) => {
   };
 
   const handleDownload = () => {
-    const url = URL.createObjectURL(uploadedFile.file);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = uploadedFile.file.name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      const url = URL.createObjectURL(uploadedFile.file);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = uploadedFile.file.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`Downloaded ${uploadedFile.file.name}`);
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Failed to download file");
+    }
   };
 
   return (
