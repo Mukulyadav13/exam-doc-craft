@@ -33,10 +33,13 @@ const DocumentUploadCard = ({ document, examId }: DocumentUploadCardProps) => {
     const size = file.size;
     const issues: string[] = [];
 
-    // Check format
+    // Accept any format on upload - we'll convert it
     const normalizedFormat = format.replace("JPEG", "JPG");
+    const targetFormat = document.format[0];
+    
+    // Only flag as issue if format doesn't match target (we'll convert it)
     if (!document.format.some(f => f === normalizedFormat || (f === "JPG" && format === "JPEG"))) {
-      issues.push(`Format must be ${document.format.join(" or ")}`);
+      issues.push(`Will be converted to ${targetFormat}`);
     }
 
     // Check size
@@ -50,23 +53,28 @@ const DocumentUploadCard = ({ document, examId }: DocumentUploadCardProps) => {
       issues.push(`Size exceeds ${sizeReq.max} KB`);
     }
 
-    // Get dimensions for images
+    // Get dimensions for images (PDF will be handled during conversion)
     let dimensions: { width: number; height: number } | undefined;
-    if (file.type.startsWith("image/")) {
+    if (file.type.startsWith("image/") || file.type === "application/pdf") {
       try {
-        dimensions = await getImageDimensions(file);
-        
-        if (document.dimensions && dimensions) {
-          const requiredDims = parseDimensions(document.dimensions, document.dpi || 200);
+        if (file.type.startsWith("image/")) {
+          dimensions = await getImageDimensions(file);
           
-          if (requiredDims) {
-            const tolerance = 50; // pixels tolerance
+          if (document.dimensions && dimensions) {
+            const requiredDims = parseDimensions(document.dimensions, document.dpi || 200);
             
-            if (Math.abs(dimensions.width - requiredDims.width) > tolerance || 
-                Math.abs(dimensions.height - requiredDims.height) > tolerance) {
-              issues.push(`Dimensions should be ${document.dimensions} (currently ${dimensions.width}x${dimensions.height}px)`);
+            if (requiredDims) {
+              const tolerance = 50; // pixels tolerance
+              
+              if (Math.abs(dimensions.width - requiredDims.width) > tolerance || 
+                  Math.abs(dimensions.height - requiredDims.height) > tolerance) {
+                issues.push(`Dimensions should be ${document.dimensions} (currently ${dimensions.width}x${dimensions.height}px)`);
+              }
             }
           }
+        } else {
+          // For PDF, we'll get dimensions after conversion
+          issues.push("PDF will be converted to image");
         }
       } catch (error) {
         console.error("Error getting dimensions:", error);
@@ -88,13 +96,19 @@ const DocumentUploadCard = ({ document, examId }: DocumentUploadCardProps) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Accept ANY file format
     const validated = await validateFile(file);
     setUploadedFile(validated);
     
     if (validated.isCompliant) {
       toast.success("Document meets all requirements!");
     } else {
-      toast.info("Document uploaded. Click 'Resize' to fix issues.");
+      const formatInfo = file.type === 'application/pdf' 
+        ? 'PDF will be converted to image format' 
+        : file.type.startsWith('image/') 
+        ? 'Image will be resized to requirements' 
+        : 'Document will be converted to required format';
+      toast.info(`Document uploaded. ${formatInfo}`);
     }
   };
 
@@ -207,6 +221,7 @@ const DocumentUploadCard = ({ document, examId }: DocumentUploadCardProps) => {
             <FilePreview 
               uploadedFile={uploadedFile} 
               onConvert={handleConvert}
+              documentName={document.name}
             />
           </CardContent>
         )}

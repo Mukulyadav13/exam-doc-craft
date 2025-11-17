@@ -1,4 +1,8 @@
 // Real image processing utilities for document conversion
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Configure PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 export interface ConversionOptions {
   targetFormat: string;
@@ -9,10 +13,47 @@ export interface ConversionOptions {
   dpi?: number;
 }
 
+// Convert PDF to image first if needed
+const convertPDFToImage = async (file: File): Promise<File> => {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const page = await pdf.getPage(1); // Get first page
+  
+  const viewport = page.getViewport({ scale: 2 }); // 2x scale for better quality
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  
+  if (!context) throw new Error('Could not get canvas context');
+  
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  
+  await page.render({
+    canvasContext: context,
+    viewport: viewport,
+  } as any).promise;
+  
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('PDF to image conversion failed'));
+        return;
+      }
+      resolve(new File([blob], file.name.replace('.pdf', '.jpg'), { type: 'image/jpeg' }));
+    }, 'image/jpeg', 0.95);
+  });
+};
+
 export const convertImage = async (
   file: File,
   options: ConversionOptions
 ): Promise<Blob> => {
+  // Handle PDF files
+  let processFile = file;
+  if (file.type === 'application/pdf') {
+    processFile = await convertPDFToImage(file);
+  }
+  
   return new Promise((resolve, reject) => {
     const img = new Image();
     const reader = new FileReader();
@@ -104,7 +145,7 @@ export const convertImage = async (
       reject(new Error("Failed to read file"));
     };
 
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(processFile);
   });
 };
 
