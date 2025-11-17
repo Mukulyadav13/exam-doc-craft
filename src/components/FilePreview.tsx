@@ -16,9 +16,10 @@ interface UploadedFile {
 interface FilePreviewProps {
   uploadedFile: UploadedFile;
   onConvert: () => void;
+  documentName: string;
 }
 
-const FilePreview = ({ uploadedFile, onConvert }: FilePreviewProps) => {
+const FilePreview = ({ uploadedFile, onConvert, documentName }: FilePreviewProps) => {
   const formatSize = (bytes: number) => {
     const kb = bytes / 1024;
     return kb < 1024 ? `${kb.toFixed(2)} KB` : `${(kb / 1024).toFixed(2)} MB`;
@@ -54,12 +55,17 @@ const FilePreview = ({ uploadedFile, onConvert }: FilePreviewProps) => {
       const url = URL.createObjectURL(uploadedFile.file);
       const a = document.createElement("a");
       a.href = url;
-      a.download = uploadedFile.file.name;
+      
+      // Create filename with format: documentname_resize.extension
+      const fileExtension = uploadedFile.file.name.split('.').pop();
+      const formattedName = documentName.toLowerCase().replace(/\s+/g, '_');
+      a.download = `${formattedName}_resize.${fileExtension}`;
+      
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success(`Downloaded ${uploadedFile.file.name}`);
+      toast.success(`Downloaded ${formattedName}_resize.${fileExtension}`);
     } catch (error) {
       console.error("Download error:", error);
       toast.error("Failed to download file");
